@@ -37,7 +37,7 @@
     <modules>
         <module>modules/parent</module>
         <module>modules/base</module>
-        <module>modules/http</module>
+        <!--<module>modules/http</module>-->
         <module>modules/tcp</module>
         <module>modules/udp</module>
         <module>modules/xmpp</module>
