@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one
+  ~ or more contributor license agreements. See the NOTICE file
+  ~ distributed with this work for additional information
+  ~ regarding copyright ownership. The ASF licenses this file
+  ~ to you under the Apache License, Version 2.0 (the
+  ~ "License"); you may not use this file except in compliance
+  ~ with the License. You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied. See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+<document>
+    <properties>
+        <title>Mail transport</title>
+    </properties>
+    <body>
+        <section name="Introduction">
+            <p>The mail transport allows to send and receive messages using MIME compliant mail messages. The transport sender
+            transmits outgoing messages using SMTP, while the transport listener connects to one or more mail accounts
+            and periodically polls these accounts for new incoming messages. The implementation is based on
+            <a href="http://java.sun.com/products/javamail/">JavaMail</a> and therefore supports any mail store protocol
+            for which a JavaMail provider is available.</p>
+        </section>
+        <section name="Transport configuration">
+    <pre xml:space="preserve">    &lt;transportSender name="mailto" class="org.apache.synapse.transport.mail.MailTransportSender"&gt;
+        &lt;parameter name="mail.smtp.host"&gt;smtp.gmail.com&lt;/parameter&gt;
+        &lt;parameter name="mail.smtp.port"&gt;587&lt;/parameter&gt;
+        &lt;parameter name="mail.smtp.starttls.enable"&gt;true&lt;/parameter&gt;
+        &lt;parameter name="mail.smtp.auth"&gt;true&lt;/parameter&gt;
+        &lt;parameter name="mail.smtp.user"&gt;synapse.demo.0&lt;/parameter&gt;
+        &lt;parameter name="mail.smtp.password"&gt;mailpassword&lt;/parameter&gt;
+        &lt;parameter name="mail.smtp.from"&gt;synapse.demo.0@gmail.com&lt;/parameter&gt;
+    &lt;/transportSender&gt;</pre>
+        </section>
+        <section name="Endpoint configuration">
+            <p>Endpoints can be configured both at the transport level and at the service level. In order receive messages using
+            the mail transport, the listener or the service must be configured with a set of parameters
+            to access the corresponding mailbox account. All service parameters starting with <tt>mail.</tt> are
+            interpreted as JavaMail environment properties. The most relevant are <tt>mail.<em>&lt;protocol&gt;</em>.host</tt>
+            and <tt>mail.<em>&lt;protocol&gt;</em>.user</tt>, where <tt><em>&lt;protocol&gt;</em></tt> is typically <tt>pop3</tt>
+            or <tt>imap</tt>. Assuming that Sun's JavaMail implementation is used, the complete list of supported properties for these
+            two protocols can be found <a href="http://java.sun.com/products/javamail/javadocs/com/sun/mail/pop3/package-summary.html">here</a>
+            and <a href="http://java.sun.com/products/javamail/javadocs/com/sun/mail/imap/package-summary.html">here</a>.</p>
+            <p>In additional to the JavaMail environment properties, the following transport specific service parameters are
+            used:</p>
+            <table class="bodyTable">
+                <tr>
+                    <th>Parameter</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>transport.PollInterval</td>
+                    <td>No</td>
+                    <td>The poll interval in seconds.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.Address</td>
+                    <td>Yes</td>
+                    <td>The address used to calculate the endpoint reference for the service. It is assumed that mails
+                    sent to this address will be delivered to the mailbox account configured for the service.
+                    Note that the transport has no means to validate this value and an incorrect address will not
+                    be detected.</td>
+                </tr>
+                <tr>
+                    <td>mail.<em>&lt;protocol&gt;</em>.password</td>
+                    <td>Yes</td>
+                    <td>The password for the mailbox account.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.Protocol</td>
+                    <td>Yes</td>
+                    <td>The mail store protocol to be used. The value must be protocol identifier recognized by JavaMail.
+                    Usual values are <tt>pop3</tt> and <tt>imap</tt>. Note that the SSL variants of these two protocols
+                    are not considered as distinct protocols. Rather, SSL is configured using the appropriate JavaMail
+                    environment properties.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.ContentType</td>
+                    <td>No</td>
+                    <td>[FIXME: why do we need a content type at this level if we assume that the mails are MIME messages???]</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.ReplyAddress</td>
+                    <td>No</td>
+                    <td>The reply-to address to be used when no From or Reply-To header is present in the
+                    request message.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.Folder</td>
+                    <td>No</td>
+                    <td>The folder to read messages from. Defaults to <tt>INBOX</tt>.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.PreserveHeaders, transport.mail.RemoveHeaders</td>
+                    <td>No</td>
+                    <td>These two properties control which MIME headers of the received message will be stored
+                    in the <tt>TRANSPORT_HEADERS</tt> property of the message context. Both parameters expect a
+                    comma separated list of header names as value. <tt>transport.mail.PreserveHeaders</tt> specifies
+                    a whitelist of headers to retain, while <tt>transport.mail.RemoveHeaders</tt> specifies a
+                    blacklist of headers to remove. Note that the two parameters should not be used simultaneously.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.ActionAfterProcess</td>
+                    <td>No</td>
+                    <td>Determines what the transport should do with the message after successful processing.
+                    Possible values are <tt>MOVE</tt> and <tt>DELETE</tt>. The default value is <tt>DELETE</tt>.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.ActionAfterFailure</td>
+                    <td>No</td>
+                    <td>Determines what the transport should do with the message if processing fails.
+                    Possible values are <tt>MOVE</tt> and <tt>DELETE</tt>. The default value is <tt>DELETE</tt>.
+                    [FIXME: we should reconsider this; it is dangerous!]</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.MoveAfterProcess</td>
+                    <td>Conditional</td>
+                    <td>Specifies the destination folder if <tt>transport.mail.ActionAfterProcess</tt>
+                    is <tt>MOVE</tt>.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.MoveAfterFailure</td>
+                    <td>Conditional</td>
+                    <td>Specifies the destination folder if <tt>transport.mail.ActionAfterFailure</tt>
+                    is <tt>MOVE</tt>.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.MaxRetryCount</td>
+                    <td>No</td>
+                    <td>The number of connection attempts. When the maximum number of retries is
+                    exceeded, a new poll is scheduled after the normal poll interval.
+                    The default value is 0, i.e. connection failures are simply ignored.</td>
+                </tr>
+                <tr>
+                    <td>transport.mail.ReconnectTimeout</td>
+                    <td>No</td>
+                    <td>The interval between two connection attempts if the first failed.
+                    The default value is 0, i.e. a new connection is attempted immediately.
+                    [FIXME: either it is not implemented as intended or the name of the property is misleading; it is not a timeout, but an interval]</td>
+                </tr>
+            </table>
+        </section>
+    </body>
+</document>
