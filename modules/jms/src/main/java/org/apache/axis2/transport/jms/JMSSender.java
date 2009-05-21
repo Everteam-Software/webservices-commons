@@ -163,22 +163,30 @@ public class JMSSender extends AbstractTransportSender implements ManagementSupp
         Destination replyDestination = jmsOut.getReplyDestination();
 
         // if this is a synchronous out-in, prepare to listen on the response destination
+        String replyDestName = (String) msgCtx.getProperty(JMSConstants.JMS_REPLY_TO);
+        if (replyDestName == null && jmsConnectionFactory != null) {
+            replyDestName = jmsConnectionFactory.getReplyToDestination();
+        }
+
+        if (replyDestName != null) {
+            if (jmsConnectionFactory != null) {
+                replyDestination = jmsConnectionFactory.getDestination(replyDestName);
+            } else {
+                replyDestination = jmsOut.getReplyDestination(replyDestName);
+            }
+        }
         if (waitForResponse) {
-
-            String replyDestName = (String) msgCtx.getProperty(JMSConstants.JMS_REPLY_TO);
-            if (replyDestName == null && jmsConnectionFactory != null) {
-                replyDestName = jmsConnectionFactory.getReplyToDestination();
-            }
-
-            if (replyDestName != null) {
-                if (jmsConnectionFactory != null) {
-                    replyDestination = jmsConnectionFactory.getDestination(replyDestName);
-                } else {
-                    replyDestination = jmsOut.getReplyDestination(replyDestName);
-                }
-            }
-            replyDestination = JMSUtils.setReplyDestination(
-                replyDestination, messageSender.getSession(), message);
+	        if (replyDestination == null) {
+	        	try {
+		        	replyDestination = messageSender.getSession().createTemporaryQueue();
+	            } catch (JMSException e) {
+	                handleException("Error creating a temporary queue for JMS response message from the message context", e);
+	            }
+	        }
+        }
+        if (replyDestination != null) {
+	        replyDestination = JMSUtils.setReplyDestination(
+	            replyDestination, messageSender.getSession(), message);
         }
 
         try {
