@@ -19,11 +19,16 @@
 
 package org.apache.axis2.transport.base.threads;
 
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Worker pool implementation based on java.util.concurrent in JDK 1.5 or later.
@@ -33,7 +38,7 @@ public class NativeWorkerPool implements WorkerPool {
     static final Log log = LogFactory.getLog(NativeWorkerPool.class);
 
     private final ThreadPoolExecutor executor;
-    private final LinkedBlockingQueue<Runnable> blockingQueue;
+    private final BlockingQueue<Runnable> blockingQueue;
 
     public NativeWorkerPool(int core, int max, int keepAlive,
         int queueLength, String threadGroupName, String threadGroupId) {
@@ -41,14 +46,28 @@ public class NativeWorkerPool implements WorkerPool {
         if (log.isDebugEnabled()) {
             log.debug("Using native util.concurrent package..");
         }
-        blockingQueue =
-            (queueLength == -1 ? new LinkedBlockingQueue<Runnable>()
-                               : new LinkedBlockingQueue<Runnable>(queueLength));
+        switch (queueLength) {
+        case 0:
+        	blockingQueue = new SynchronousQueue<Runnable>();
+    		break;
+        case -1:
+        	blockingQueue = new LinkedBlockingQueue<Runnable>(); 
+    		break;
+    	default:
+    		blockingQueue = new ArrayBlockingQueue<Runnable>(queueLength);
+    		break;
+        }
         executor = new ThreadPoolExecutor(
             core, max, keepAlive,
             TimeUnit.SECONDS,
             blockingQueue,
-            new NativeThreadFactory(new ThreadGroup(threadGroupName), threadGroupId));
+            new NativeThreadFactory(new ThreadGroup(threadGroupName), threadGroupId), 
+            new RejectedExecutionHandler() {
+            	public void rejectedExecution(Runnable runnable,
+            			ThreadPoolExecutor threadpoolexecutor) {
+            		System.out.println("Thread pool executor " + threadpoolexecutor + " rejected execution of runnable " + runnable);
+            	}
+            });
     }
 
     public void execute(final Runnable task) {
