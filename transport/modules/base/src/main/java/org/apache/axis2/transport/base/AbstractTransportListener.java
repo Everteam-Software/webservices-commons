@@ -98,7 +98,7 @@ public abstract class AbstractTransportListener implements TransportListener {
             throw new AxisFault("Unsupported thread pool for task execution - Axis2 thread pool");
         } else {
             this.workerPool = WorkerPoolFactory.getWorkerPool(
-	            100000, 100000, 5, 10, getTransportName() + "Server Worker thread group", getTransportName() + "-Worker");
+	            0, Integer.MAX_VALUE, 5, 0, getTransportName() + "Server Worker thread group", getTransportName() + "-Worker");
         }
 
         // register to receive updates on services for lifetime management
