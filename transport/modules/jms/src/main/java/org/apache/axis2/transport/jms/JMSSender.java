@@ -172,7 +172,8 @@ public class JMSSender extends AbstractTransportSender implements ManagementSupp
             if (jmsConnectionFactory != null) {
                 replyDestination = jmsConnectionFactory.getDestination(replyDestName);
             } else {
-                replyDestination = jmsOut.getReplyDestination(replyDestName);
+                String replyDestType = (String) msgCtx.getProperty(JMSConstants.JMS_REPLY_TO_TYPE);
+                replyDestination = jmsOut.getReplyDestination(replyDestName, replyDestType);
             }
         }
         if (waitForResponse) {
@@ -180,7 +181,7 @@ public class JMSSender extends AbstractTransportSender implements ManagementSupp
 	        	try {
 		        	replyDestination = messageSender.getSession().createTemporaryQueue();
 	            } catch (JMSException e) {
-	                handleException("Error creating a temporary queue for JMS response message from the message context", e);
+	                handleException("Error creating a temporary queue for JMS response message from the message context", e, msgCtx, message, jmsConnectionFactory);
 	            }
 	        }
         }
@@ -192,10 +193,13 @@ public class JMSSender extends AbstractTransportSender implements ManagementSupp
         try {
             messageSender.send(message, msgCtx);
             metrics.incrementMessagesSent(msgCtx);
-
         } catch (AxisJMSException e) {
             metrics.incrementFaultsSending();
-            handleException("Error sending JMS message", e);
+            if (jmsConnectionFactory != null) {
+	            handleException("Error sending JMS message", e, msgCtx, message, jmsConnectionFactory);
+            } else {
+	            handleException("Error sending JMS message", e, msgCtx, message, jmsOut);
+            }
         }
 
         try {
@@ -221,13 +225,21 @@ public class JMSSender extends AbstractTransportSender implements ManagementSupp
 
             // We assume here that the response uses the same message property to
             // specify the content type of the message.
+            try {
             waitForResponseAndProcess(messageSender.getSession(), replyDestination,
                 msgCtx, correlationId, contentTypeProperty);
+            } catch (Exception e) {
+            	if (jmsConnectionFactory != null) {
+            		handleException("Error receiving JMS response message for attached request message", e, msgCtx, message, jmsConnectionFactory);
+            	} else {
+                	handleException("Error receiving JMS response message for attached request message", e, msgCtx, message, jmsOut);            	
+            	}
+            }
             // TODO ********************************************************************************
         }
     }
 
-    /**
+	/**
      * Create a Consumer for the reply destination and wait for the response JMS message
      * synchronously. If a message arrives within the specified time interval, process it
      * through Axis2
@@ -494,4 +506,17 @@ public class JMSSender extends AbstractTransportSender implements ManagementSupp
     private String getProperty(MessageContext mc, String key) {
         return (String) mc.getProperty(key);
     }
+    
+    protected void handleException(String msg, Exception e, 
+    		MessageContext msgContext, Message message, JMSConnectionFactory jmsConnectionFactory) throws AxisFault {
+        JMSUtils.handleDeadLetter(msgContext, message, jmsConnectionFactory, e);
+    	super.handleException(msg, e);
+    }
+    
+    private void handleException(String msg, Exception e,
+			MessageContext msgCtx, Message message, JMSOutTransportInfo jmsOut) throws AxisFault {
+        JMSUtils.handleDeadLetter(msgCtx, message, jmsOut, e);
+    	super.handleException(msg, e);
+	}
+
 }

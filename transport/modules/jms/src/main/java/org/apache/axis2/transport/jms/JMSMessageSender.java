@@ -48,7 +48,8 @@ public class JMSMessageSender {
     private int cacheLevel = JMSConstants.CACHE_CONNECTION;
     /** Should this sender use JMS 1.1 ? (if false, defaults to 1.0.2b) */
     private boolean jmsSpec11 = true;
-    /** Are we sending to a Queue ? */
+
+	/** Are we sending to a Queue ? */
     private Boolean isQueue = null;
 
     /**
@@ -321,4 +322,12 @@ public class JMSMessageSender {
     public Session getSession() {
         return session;
     }
+    
+    public boolean isJmsSpec11() {
+		return jmsSpec11;
+	}
+
+	public void setJmsSpec11(boolean jmsSpec11) {
+		this.jmsSpec11 = jmsSpec11;
+	}
 }

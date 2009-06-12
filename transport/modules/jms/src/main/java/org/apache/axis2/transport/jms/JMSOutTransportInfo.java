@@ -15,19 +15,27 @@
 */
 package org.apache.axis2.transport.jms;
 
-import org.apache.axis2.transport.OutTransportInfo;
-import org.apache.axis2.transport.base.BaseUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.util.Hashtable;
 
+import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
+import javax.jms.JMSException;
+import javax.jms.MessageProducer;
+import javax.jms.Queue;
+import javax.jms.QueueSession;
+import javax.jms.Session;
 import javax.jms.Topic;
+import javax.jms.TopicSession;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NameNotFoundException;
 import javax.naming.NamingException;
-import java.util.Hashtable;
+
+import org.apache.axis2.transport.OutTransportInfo;
+import org.apache.axis2.transport.base.BaseUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * The JMS OutTransportInfo is a holder of information to send an outgoing message
@@ -112,6 +120,7 @@ public class JMSOutTransportInfo implements OutTransportInfo {
             }
 
             replyDestinationName = properties.get(JMSConstants.PARAM_REPLY_DESTINATION);
+            replyDestinationType = properties.get(JMSConstants.PARAM_REPLY_DEST_TYPE);        
             contentTypeProperty = properties.get(JMSConstants.CONTENT_TYPE_PROPERTY_PARAM);
             try {
                 context = new InitialContext(properties);
@@ -193,10 +202,17 @@ public class JMSOutTransportInfo implements OutTransportInfo {
         if(replyDestinationName == null) {
             return null;
         }
-
+        
         try {
             return JMSUtils.lookup(context, Destination.class, replyDestinationName);
         } catch (NameNotFoundException e) {
+            try {
+                return JMSUtils.lookup(context, Destination.class,
+                    (JMSConstants.DESTINATION_TYPE_TOPIC.equals(replyDestinationType) ?
+                        "dynamicTopics/" : "dynamicQueues/") + replyDestinationName);
+            } catch (NamingException x) {
+                handleException("Cannot locate destination : " + replyDestinationName + " using " + url);
+            }
             if (log.isDebugEnabled()) {
                 log.debug("Cannot locate destination : " + replyDestinationName + " using " + url);
             }
@@ -212,21 +228,77 @@ public class JMSOutTransportInfo implements OutTransportInfo {
      * @param replyDest the JNDI name to lookup Destination required
      * @return Destination for the JNDI name passed
      */
-    public Destination getReplyDestination(String replyDest) {
+    public Destination getReplyDestination(String replyDest, String replyDestType) {
+    	return getDestination(replyDest, replyDestType);
+    }
+    
+    public Destination getDestination(String destination, String destinationType) {
         try {
-            return JMSUtils.lookup(jmsConnectionFactory.getContext(), Destination.class,
-                    replyDest);
+        	Context context;
+        	if (jmsConnectionFactory == null) {
+        		context = this.context;
+        	} else {
+        		context = jmsConnectionFactory.getContext();
+        	}
+            return JMSUtils.lookup(context, Destination.class,
+                    destination);
         } catch (NameNotFoundException e) {
+            try {
+                return JMSUtils.lookup(context, Destination.class,
+                    (JMSConstants.DESTINATION_TYPE_TOPIC.equals(destinationType) ?
+                        "dynamicTopics/" : "dynamicQueues/") + destination);
+            } catch (NamingException x) {
+                handleException("Cannot locate destination : " + destination + " using " + context);
+            }
             if (log.isDebugEnabled()) {
-                log.debug("Cannot locate reply destination : " + replyDest, e);
+                log.debug("Cannot locate reply destination : " + destination, e);
             }
         } catch (NamingException e) {
-            handleException("Cannot locate reply destination : " + replyDest, e);
+            handleException("Cannot locate reply destination : " + destination, e);
         }
         return null;
     }
 
-
+    public Destination createQueue(String queueName) {
+    	try {
+	    	Connection connection;
+	    	Session session;
+	    	if (jmsConnectionFactory != null) {
+	    		connection = jmsConnectionFactory.getConnection();
+	    		session = jmsConnectionFactory.getSession(connection);
+	    	} else {
+	        	connection = connectionFactory.createConnection();
+	        	session = connection.createSession(true, Session.SESSION_TRANSACTED);
+	    	}
+			return session.createQueue(queueName);
+    	} catch (JMSException e) {
+    		return null;
+    	}
+    }
+    
+    public MessageProducer createProducer(Destination destination) {
+    	try {
+	    	Connection connection;
+	    	Session session;
+	    	if (jmsConnectionFactory != null) {
+	    		connection = jmsConnectionFactory.getConnection();
+	    		session = jmsConnectionFactory.getSession(connection);
+	    	} else {
+	        	connection = connectionFactory.createConnection();
+	        	session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+	    	}
+	    	if (session instanceof QueueSession && destination instanceof Queue) {
+	    		return ((QueueSession) session).createSender((Queue) destination);
+	    	} else if (session instanceof TopicSession && destination instanceof Topic) {
+	    		return ((TopicSession) session).createPublisher((Topic) destination);
+	    	} else {
+				return session.createProducer(destination);
+	    	}
+    	} catch (JMSException e) {
+    		return null;
+    	}
+    }
+    
     private void handleException(String s) {
         log.error(s);
         throw new AxisJMSException(s);

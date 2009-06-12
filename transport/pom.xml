@@ -30,7 +30,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.apache.axis2</groupId>
     <artifactId>axis2-transports</artifactId>
-    <version>1.0-i3</version>
+    <version>1.0-i4</version>
     <packaging>pom</packaging>
     <name>Apache Axis2 - Transport - Root</name>
 

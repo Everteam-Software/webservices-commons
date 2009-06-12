@@ -181,6 +181,27 @@ public class JMSConnectionFactory {
         }
         return null;
     }
+    
+    public Destination getDestination(String name, String type) {
+        try {
+            return JMSUtils.lookup(context, Destination.class, name);
+        } catch (NameNotFoundException e) {
+            try {
+                return JMSUtils.lookup(context, Destination.class,
+                    (JMSConstants.DESTINATION_TYPE_TOPIC.equals(type) ?
+                        "dynamicTopics/" : "dynamicQueues/") + name);
+            } catch (NamingException x) {
+                handleException("Cannot locate destination : " + name + " using " + context, x);
+            }
+            if (log.isDebugEnabled()) {
+                log.debug("Cannot locate reply destination : " + name, e);
+            }
+        } catch (NamingException e) {
+            handleException("Unknown JMS Destination : " + name + " using : " + parameters, e);
+        }
+        return null;
+    	
+    }
 
     /**
      * Get the reply Destination from the PARAM_REPLY_DESTINATION parameter
@@ -239,7 +260,7 @@ public class JMSConnectionFactory {
      * Is a session transaction requested from users of this JMS CF?
      * @return session transaction required by the clients of this?
      */
-    private boolean isSessionTransacted() {
+    public boolean isSessionTransacted() {
         return parameters.get(JMSConstants.PARAM_SESSION_TRANSACTED) == null ||
             Boolean.valueOf(parameters.get(JMSConstants.PARAM_SESSION_TRANSACTED));
     }

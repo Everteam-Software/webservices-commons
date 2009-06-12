@@ -270,4 +270,14 @@ public class JMSConstants {
     /** The JMSXGroupSeq property */
     public static final String JMSX_GROUP_SEQ = "JMSXGroupSeq";
 
+    /**
+     * A MessageContext property or client Option stating the name of the dead letter queue 
+     */
+    public static final String JMS_DEAD_LETTER_QUEUE = "JMS_DEAD_LETTER_QUEUE";
+    /**
+     * The default JMS dead letter queue name
+     */
+    public static final String DEFAULT_DEAD_LETTER_QUEUE = "DeadLetterQueue";
+    
+    public static final String PROPERTY_DEAD_LETTER_CAUSE = "Cause Of Death";
 }

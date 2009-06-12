@@ -15,8 +15,41 @@
 */
 package org.apache.axis2.transport.jms;
 
+import java.lang.reflect.Method;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.jms.BytesMessage;
+import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
+import javax.jms.DeliveryMode;
+import javax.jms.Destination;
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.MessageConsumer;
+import javax.jms.MessageProducer;
+import javax.jms.Queue;
+import javax.jms.QueueConnection;
+import javax.jms.QueueConnectionFactory;
+import javax.jms.QueueSender;
+import javax.jms.QueueSession;
+import javax.jms.Session;
+import javax.jms.TextMessage;
+import javax.jms.Topic;
+import javax.jms.TopicConnection;
+import javax.jms.TopicConnectionFactory;
+import javax.jms.TopicSession;
+import javax.mail.internet.ContentType;
+import javax.mail.internet.ParseException;
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.Reference;
+
 import org.apache.axiom.om.OMElement;
-import org.apache.axiom.soap.SOAPEnvelope;
 import org.apache.axis2.AxisFault;
 import org.apache.axis2.Constants;
 import org.apache.axis2.builder.Builder;
@@ -28,24 +61,12 @@ import org.apache.axis2.description.Parameter;
 import org.apache.axis2.format.DataSourceMessageBuilder;
 import org.apache.axis2.format.TextMessageBuilder;
 import org.apache.axis2.format.TextMessageBuilderAdapter;
+import org.apache.axis2.transport.TransportUtils;
+import org.apache.axis2.transport.base.BaseConstants;
+import org.apache.axis2.transport.base.BaseUtils;
+import org.apache.axis2.transport.base.threads.WorkerPool;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.axis2.transport.TransportUtils;
-import org.apache.axis2.transport.base.BaseUtils;
-import org.apache.axis2.transport.base.BaseConstants;
-import org.apache.axis2.transport.base.threads.WorkerPool;
-
-import javax.jms.*;
-import javax.jms.Queue;
-import javax.mail.internet.ContentType;
-import javax.mail.internet.ParseException;
-import javax.naming.Context;
-import javax.naming.NamingException;
-import javax.naming.Reference;
-import javax.xml.stream.XMLStreamException;
-
-import java.lang.reflect.Method;
-import java.util.*;
 
 /**
  * Miscallaneous methods used for the JMS transport
@@ -428,14 +449,14 @@ public class JMSUtils extends BaseUtils {
         } catch (JMSException ignore) {}
 
         // any other transport properties / headers
-        Enumeration e = null;
+        Enumeration<String> e = null;
         try {
             e = message.getPropertyNames();
         } catch (JMSException ignore) {}
 
         if (e != null) {
             while (e.hasMoreElements()) {
-                String headerName = (String) e.nextElement();
+                String headerName = e.nextElement();
                 try {
                     map.put(headerName, message.getStringProperty(headerName));
                     continue;
@@ -545,8 +566,7 @@ public class JMSUtils extends BaseUtils {
             //       Anyway, the result is not accurate since we don't know what encoding the JMS provider uses.
             return ((TextMessage) message).getText().getBytes().length;
         } else {
-            log.warn("Can't determine size of JMS message; unsupported message type : "
-                    + message.getClass().getName());
+            log.warn("Can't determine size of JMS message; unsupported message type : " + message.getClass().getName());
             return 0;
         }
     }
@@ -700,10 +720,10 @@ public class JMSUtils extends BaseUtils {
         return map;
     }
 
-    private static String getRqdStringProperty(String key, Map svcMap, Map cfMap) {
-        String value = (String) svcMap.get(key);
+    private static String getRqdStringProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
+        String value = svcMap.get(key);
         if (value == null) {
-            value = (String) cfMap.get(key);
+            value = cfMap.get(key);
         }
         if (value == null) {
             throw new AxisJMSException("Service/connection factory property : " + key);
@@ -711,18 +731,18 @@ public class JMSUtils extends BaseUtils {
         return value;
     }
 
-    private static String getOptionalStringProperty(String key, Map svcMap, Map cfMap) {
-        String value = (String) svcMap.get(key);
+    private static String getOptionalStringProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
+        String value = svcMap.get(key);
         if (value == null) {
-            value = (String) cfMap.get(key);
+            value = cfMap.get(key);
         }
         return value;
     }
 
-    private static Boolean getOptionalBooleanProperty(String key, Map svcMap, Map cfMap) {
-        String value = (String) svcMap.get(key);
+    private static Boolean getOptionalBooleanProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
+        String value = svcMap.get(key);
         if (value == null) {
-            value = (String) cfMap.get(key);
+            value = cfMap.get(key);
         }
         if (value == null) {
             return null;
@@ -731,10 +751,10 @@ public class JMSUtils extends BaseUtils {
         }
     }
 
-    private static Integer getOptionalIntProperty(String key, Map svcMap, Map cfMap) {
-        String value = (String) svcMap.get(key);
+    private static Integer getOptionalIntProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
+        String value = svcMap.get(key);
         if (value == null) {
-            value = (String) cfMap.get(key);
+            value = cfMap.get(key);
         }
         if (value != null) {
             try {
@@ -746,10 +766,10 @@ public class JMSUtils extends BaseUtils {
         return null;
     }
 
-    private static Double getOptionalDoubleProperty(String key, Map svcMap, Map cfMap) {
-        String value = (String) svcMap.get(key);
+    private static Double getOptionalDoubleProperty(String key, Map<String, String> svcMap, Map<String, String> cfMap) {
+        String value = svcMap.get(key);
         if (value == null) {
-            value = (String) cfMap.get(key);
+            value = cfMap.get(key);
         }
         if (value != null) {
             try {
@@ -761,12 +781,12 @@ public class JMSUtils extends BaseUtils {
         return null;
     }
 
-    private static int getTransactionality(Map svcMap, Map cfMap) {
+    private static int getTransactionality(Map<String, String> svcMap, Map<String, String> cfMap) {
 
         String key = BaseConstants.PARAM_TRANSACTIONALITY;
-        String val = (String) svcMap.get(key);
+        String val = svcMap.get(key);
         if (val == null) {
-            val = (String) cfMap.get(key);
+            val = cfMap.get(key);
         }
 
         if (val == null) {
@@ -784,12 +804,12 @@ public class JMSUtils extends BaseUtils {
         }
     }
 
-    private static int getDestinationType(Map svcMap, Map cfMap) {
+    private static int getDestinationType(Map<String, String> svcMap, Map<String, String> cfMap) {
 
         String key = JMSConstants.PARAM_DEST_TYPE;
-        String val = (String) svcMap.get(key);
+        String val = svcMap.get(key);
         if (val == null) {
-            val = (String) cfMap.get(key);
+            val = cfMap.get(key);
         }
 
         if (JMSConstants.DESTINATION_TYPE_TOPIC.equalsIgnoreCase(val)) {
@@ -798,12 +818,12 @@ public class JMSUtils extends BaseUtils {
         return JMSConstants.QUEUE;
     }
 
-    private static int getSessionAck(Map svcMap, Map cfMap) {
+    private static int getSessionAck(Map<String, String> svcMap, Map<String, String> cfMap) {
 
         String key = JMSConstants.PARAM_SESSION_ACK;
-        String val = (String) svcMap.get(key);
+        String val = svcMap.get(key);
         if (val == null) {
-            val = (String) cfMap.get(key);
+            val = cfMap.get(key);
         }
 
         if (val == null || "AUTO_ACKNOWLEDGE".equalsIgnoreCase(val)) {
@@ -823,12 +843,12 @@ public class JMSUtils extends BaseUtils {
         }
     }
 
-    private static int getCacheLevel(Map svcMap, Map cfMap) {
+    private static int getCacheLevel(Map<String, String> svcMap, Map<String, String> cfMap) {
 
         String key = JMSConstants.PARAM_CACHE_LEVEL;
-        String val = (String) svcMap.get(key);
+        String val = svcMap.get(key);
         if (val == null) {
-            val = (String) cfMap.get(key);
+            val = cfMap.get(key);
         }
 
         if ("none".equalsIgnoreCase(val)) {
@@ -845,12 +865,12 @@ public class JMSUtils extends BaseUtils {
         return JMSConstants.CACHE_AUTO;
     }
 
-    private static boolean getJMSSpecVersion(Map svcMap, Map cfMap) {
+    private static boolean getJMSSpecVersion(Map<String, String> svcMap, Map<String, String> cfMap) {
 
         String key = JMSConstants.PARAM_JMS_SPEC_VER;
-        String val = (String) svcMap.get(key);
+        String val = svcMap.get(key);
         if (val == null) {
-            val = (String) cfMap.get(key);
+            val = cfMap.get(key);
         }
 
         if (val == null || "1.1".equals(val)) {
@@ -1008,6 +1028,11 @@ public class JMSUtils extends BaseUtils {
         }
     }
 
+    public static JMSMessageSender createJMSSender(JMSOutTransportInfo jmsOut)
+    throws JMSException {
+        return createJMSSender(jmsOut, jmsOut.getDestination());
+    }
+    
     /**
      * Create a one time MessageProducer for the given JMS OutTransport information
      * For simplicity and best compatibility, this method uses only JMS 1.0.2b API.
@@ -1017,7 +1042,7 @@ public class JMSUtils extends BaseUtils {
      * @return a JMSSender based on one-time use resources
      * @throws JMSException on errors, to be handled and logged by the caller 
      */
-    public static JMSMessageSender createJMSSender(JMSOutTransportInfo jmsOut)
+    public static JMSMessageSender createJMSSender(JMSOutTransportInfo jmsOut, Destination destination)
         throws JMSException {
 
         // digest the targetAddress and locate CF from the EPR
@@ -1062,7 +1087,6 @@ public class JMSUtils extends BaseUtils {
 
         Session session = null;
         MessageProducer producer = null;
-        Destination destination = jmsOut.getDestination();
 
         if (destType == JMSConstants.QUEUE) {
             session = ((QueueConnection) connection).
@@ -1094,4 +1118,138 @@ public class JMSUtils extends BaseUtils {
             return "Generic";
         }
     }
+    
+    public static void handleDeadLetter(
+            MessageContext msgContext, Message message, JMSConnectionFactory connFactory, Throwable cause) {
+    	String deadLetterQueueName = (String) msgContext.getProperty(JMSConstants.JMS_DEAD_LETTER_QUEUE);
+    	if (deadLetterQueueName == null || deadLetterQueueName.length() == 0) {
+    		deadLetterQueueName = JMSConstants.DEFAULT_DEAD_LETTER_QUEUE;    		
+    	}
+
+    	Session session = null;
+    	try {
+            Connection connection = connFactory.getConnection();
+            session = connFactory.getSession(connection);
+	    	Destination deadLetterQueue = connFactory.getDestination(deadLetterQueueName, JMSConstants.DESTINATION_TYPE_GENERIC);
+	    	
+	    	if (deadLetterQueue == null) {
+	            log.warn("Cannot get or lookup JMS response destination : " + deadLetterQueueName + "." +
+		                 "Attempting to create a Queue named : " + deadLetterQueueName);
+	            deadLetterQueue = session.createQueue(deadLetterQueueName);
+	        } 
+	    	
+	    	if (deadLetterQueue == null) {
+	    		handleException("Cannot get JMS response destination : " +
+	                deadLetterQueueName + " : ");
+	        }
+	        
+	        // make a copy of the message properties
+	        HashMap<String, Object> msgProperties = new HashMap<String, Object>();  
+	        for (Enumeration<String> propertyNames = message.getPropertyNames(); 
+	        		propertyNames.hasMoreElements(); ) {	        	
+	        	String propertyName = propertyNames.nextElement();
+	        	msgProperties.put(propertyName, message.getObjectProperty(propertyName));	        	
+	        }
+	        // clear the message properties in order to make them writable
+	        message.clearProperties();
+	        // re-insert the original set of message properties
+	        for (Iterator<String> propertyNames = msgProperties.keySet().iterator(); propertyNames.hasNext(); ) {
+	        	String propertyName = propertyNames.next();
+	        	message.setObjectProperty(propertyName, msgProperties.get(propertyName));
+	        }
+	        // add a message properties that identifies the root cause of the problem
+	        message.setStringProperty(JMSConstants.PROPERTY_DEAD_LETTER_CAUSE, 
+	        		cause != null ? cause.getLocalizedMessage() : "Unknown");
+	        
+	        if (deadLetterQueue != null) {
+	        	MessageProducer producer = session.createProducer(deadLetterQueue);
+	        	producer.send(message);
+	        	producer.close();
+	        }
+			if (connFactory.isSessionTransacted()) {
+				session.commit();
+			}
+    	} catch (Exception e) {
+    		log.error("Could not queue dead letter" + message, e);
+			if (connFactory.isSessionTransacted()) {
+				try {
+					session.rollback();
+				} catch (JMSException e1) {
+		    		log.error("Could not rollback session properly" + message, e);
+				}
+			}
+    	} finally {
+    		if (session != null) {
+    			try {
+					session.close();
+				} catch (JMSException e) {
+		    		log.error("Could not close session properly" + message, e);
+				}
+    		}
+    	}
+    }
+    
+    public static void handleDeadLetter(
+            MessageContext msgContext, Message message, JMSOutTransportInfo jmsOut, Throwable cause) {
+    	String deadLetterQueueName = (String) msgContext.getProperty(JMSConstants.JMS_DEAD_LETTER_QUEUE);
+    	if (deadLetterQueueName == null || deadLetterQueueName.length() == 0) {
+    		deadLetterQueueName = JMSConstants.DEFAULT_DEAD_LETTER_QUEUE;    		
+    	}
+
+    	JMSMessageSender messageSender = null;
+    	try {
+	    	Destination deadLetterQueue = jmsOut.getDestination(deadLetterQueueName, JMSConstants.DESTINATION_TYPE_QUEUE);
+	    	
+	    	if (deadLetterQueue == null) {
+	            log.warn("Cannot get or lookup JMS response destination : " + deadLetterQueueName + "." +
+		                 "Attempting to create a Queue named : " + deadLetterQueueName);
+	            deadLetterQueue = jmsOut.createQueue(deadLetterQueueName);
+	        } 
+	    	
+	    	if (deadLetterQueue == null) {
+	    		handleException("Cannot get JMS response destination : " +
+	                deadLetterQueueName + " : ");
+	        }
+	        
+            try {
+            	// setting the destination type to generic forces the sender to use jms11 spec
+                messageSender = JMSUtils.createJMSSender(jmsOut, deadLetterQueue);
+            } catch (JMSException e) {
+                handleException("Unable to create a JMSMessageSender for : " + deadLetterQueue, e);
+            }
+            
+	        // make a copy of the message properties
+	        HashMap<String, Object> msgProperties = new HashMap<String, Object>();  
+	        for (Enumeration<String> propertyNames = message.getPropertyNames(); 
+	        		propertyNames.hasMoreElements(); ) {	        	
+	        	String propertyName = propertyNames.nextElement();
+	        	msgProperties.put(propertyName, message.getObjectProperty(propertyName));	        	
+	        }
+	        // clear the message properties in order to make them writable
+	        message.clearProperties();
+	        // re-insert the original set of message properties
+	        for (Iterator<String> propertyNames = msgProperties.keySet().iterator(); propertyNames.hasNext(); ) {
+	        	String propertyName = propertyNames.next();
+	        	message.setObjectProperty(propertyName, msgProperties.get(propertyName));
+	        }
+	        // add a message properties that identifies the root cause of the problem
+	        message.setStringProperty(JMSConstants.PROPERTY_DEAD_LETTER_CAUSE, 
+	        		cause != null ? cause.getLocalizedMessage() : "Unknown");
+	        
+	        if (deadLetterQueue != null) {
+//	        	MessageProducer producer = jmsOut.createProducer(deadLetterQueue);
+//	        	messageSender.setJmsSpec11(!(producer instanceof QueueSender));
+//	        	messageSender.setProducer(producer);
+	        	messageSender.send(message, msgContext);
+	        }
+    		log.info("Enqueued un-sent message into queue dead letter" + message);
+    	} catch (Exception e) {
+    		log.error("Could not queue dead letter" + message, e);
+    	} finally {
+    		if (messageSender != null) {
+        		messageSender.close();
+    		}
+    	}
+    }
+    
 }

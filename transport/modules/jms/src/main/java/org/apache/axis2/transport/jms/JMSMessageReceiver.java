@@ -122,21 +122,23 @@ public class JMSMessageReceiver {
 
 
         boolean successful = false;
+        Throwable cause = null;
+        Holder<MessageContext> holder = new Holder<MessageContext>();
         try {
-            successful = processThoughEngine(message, ut);
+            successful = processThoughEngine(message, ut, holder);
 
         } catch (JMSException e) {
-            log.error("JMS Exception encountered while processing", e);
+            log.error("JMS Exception encountered while processing", cause = e);
         } catch (AxisFault e) {
-            log.error("Axis fault processing message", e);
+            log.error("Axis fault processing message", cause = e);
         } catch (Exception e) {
-            log.error("Unknown error processing message", e);
-
+            log.error("Unknown error processing message", cause = e);
         } finally {
             if (successful) {
                 metrics.incrementMessagesReceived();
             } else {
                 metrics.incrementFaultsReceiving();
+                JMSUtils.handleDeadLetter(holder.getDelegate(), message, jmsConnectionFactory, cause);
             }
         }
 
@@ -152,15 +154,16 @@ public class JMSMessageReceiver {
      * @throws JMSException, on JMS exceptions
      * @throws AxisFault     on Axis2 errors
      */
-    private boolean processThoughEngine(Message message, UserTransaction ut)
+    private boolean processThoughEngine(Message message, UserTransaction ut, Holder<MessageContext> holder)
         throws JMSException, AxisFault {
 
         MessageContext msgContext = jmsListener.createMessageContext();
+        holder.setDelegate(msgContext);
 
         // set the JMS Message ID as the Message ID of the MessageContext
         try {
             msgContext.setMessageID(message.getJMSMessageID());
-            msgContext.setProperty(JMSConstants.JMS_COORELATION_ID, message.getJMSMessageID());
+            msgContext.setProperty(JMSConstants.JMS_COORELATION_ID, message.getJMSCorrelationID());
         } catch (JMSException ignore) {}
 
         String soapAction = JMSUtils.getProperty(message, BaseConstants.SOAPACTION);
@@ -229,5 +232,17 @@ public class JMSMessageReceiver {
             }
             return true;
         }
+    }
+    
+    public class Holder<T> {
+    	T delegate;
+
+		public T getDelegate() {
+			return delegate;
+		}
+
+		public void setDelegate(T delegate) {
+			this.delegate = delegate;
+		}
     }
 }
