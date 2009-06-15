@@ -40,6 +40,9 @@ import org.apache.commons.logging.LogFactory;
  */
 public class TransportMBeanSupport {
     private static final Log log = LogFactory.getLog(TransportMBeanSupport.class);
+
+    // Make MBean name unique by appending this identifier
+    private static int mbeanInstanceId = 0;
     
     private boolean enabled = true;
     private boolean registered;
@@ -71,11 +74,11 @@ public class TransportMBeanSupport {
     }
     
     public TransportMBeanSupport(TransportListener listener, String name) {
-        this(name + "-listener", new TransportView(listener, null));
+        this(name + "-listener" + mbeanInstanceId++, new TransportView(listener, null));
     }
     
     public TransportMBeanSupport(TransportSender sender, String name) {
-        this(name + "-sender", new TransportView(null, sender));
+        this(name + "-sender" + mbeanInstanceId++, new TransportView(null, sender));
     }
     
     public ObjectName getMBeanName() {
@@ -91,8 +94,8 @@ public class TransportMBeanSupport {
                 mbs.registerMBean(mbeanInstance, mbeanName);
                 registered = true;
             } catch (Exception e) {
-                log.warn("Error registering a MBean with objectname ' " + mbeanName +
-                    " ' for JMX management", e);
+                log.warn("An MBean for objectname ' " + mbeanName +
+                    " ' already exists");
                 enabled = false;
             }
         }
